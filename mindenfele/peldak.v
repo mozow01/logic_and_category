@@ -171,4 +171,6 @@ Proof.
   all: simpl; auto.
 Qed.
 
-Lemma problem_1 : 
+Lemma problem_1 : forall x y z (g : x × y → z) (h : x → (z e↑ y) ), g = eval ∘ (h × id y) -> Lam g = h.
+
+
