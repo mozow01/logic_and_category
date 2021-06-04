@@ -9,7 +9,7 @@ https://github.com/coq-contribs/prfx
 
 innen a thesis is páratlan.
 
-**Kategóriák: **
+**Kategóriák:**
 
 https://en.wikipedia.org/wiki/Initial_and_terminal_objects (nekünk terminal)
 
@@ -19,7 +19,7 @@ https://en.wikipedia.org/wiki/Exponential_object
 
 együtt: https://en.wikipedia.org/wiki/Cartesian_closed_category
 
-_Lambek izo: _
+_Lambek izo:_
 
 https://en.wikipedia.org/wiki/Curry%E2%80%93Howard_correspondence#Curry%E2%80%93Howard%E2%80%93Lambek_correspondence
 
