@@ -41,15 +41,6 @@ z),
     Lam (Exp_mor ∘ (Prod_mor (Compose h First) (Compose (Id y) Second))) = h
 }.
 
-(* 
-
-  lemmácska TODO: forall x y z (g : x × y -> z), g = eval ∘ (h × id y) -> Lam g = h
-
-ez ekv. unique_exp-pel.
-
-*)
-
-
 Notation "⊤" := (Top_obj) (at level 40, no
 associativity) : type_scope.
 
