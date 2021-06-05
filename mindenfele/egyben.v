@@ -104,16 +104,18 @@ z),
 
   Exp_obj : Obj -> Obj -> Obj;
 
-  Exp_mor : forall {y z}, (Prod_obj (Exp_obj z y) y) → z;
+  Exp_app : forall {y z}, (Prod_obj (Exp_obj z y) y) → z;
 
   Lam : forall {x y z} (g : (Prod_obj x y) → z), x → (Exp_obj z y);
 
   exp_ax : forall {x y z} (g : (Prod_obj x y) → z), 
-    Exp_mor ∘ (Prod_mor (Compose (Lam g) First) (Compose (Id y) Second)) = g;
+    Exp_app ∘ (Prod_mor (Compose (Lam g) First) (Compose (Id y) Second)) = g;
   
   unique_exp : forall {x y z} (h : x → Exp_obj z y),
-    Lam (Exp_mor ∘ (Prod_mor (Compose h First) (Compose (Id y) Second))) = h
+    Lam (Exp_app ∘ (Prod_mor (Compose h First) (Compose (Id y) Second))) = h
+
 }.
+
 
 Notation "⊤" := (Top_obj) (at level 40, no
 associativity) : type_scope.
@@ -136,24 +138,24 @@ Structure VAL : Type := makeVAL
   { V :> Typ -> Obj;
     VAL_top : V Top = Top_obj;
     VAL_imp : forall {A B}, V (Imp A B) = Exp_obj (V B) (V A);
-    VAL_Cnj : forall {A B}, V (Cnj A B) = Prod_obj (V A) (V B);
+    VAL_cnj : forall {A B}, V (Cnj A B) = Prod_obj (V A) (V B);
   }.
 
 Fixpoint VAL_Cntxt (v : VAL) (G : list Typ) := 
   match G with 
     | nil => Top_obj
-    | A :: G' => Prod_obj (v A) (VAL_Cntxt v G') 
+    | A :: G' => Prod_obj (VAL_Cntxt v G') (v A)  (* hogy kompatibilis legyen az exp-beli sorrenddel *)
   end.
 
 Notation "'[[' G ']]_C' v" := (VAL_Cntxt v G) (at level 40, no associativity) :
 type_scope.
 
 Theorem soundness : forall v G A, (exists t, G ⊢ t [:] A) -> 
-                           inhabited( ([[ G ]]_C v) → (v A) ).
+                           inhabited( Hom ([[ G ]]_C v) (v A)).
 Proof.
-   intros v G A H.
+  intros v G A H.
   elim H.
-  intros.
+  intros. 
   induction H0.
   - apply inhabits.
   rewrite VAL_top.
@@ -180,10 +182,26 @@ Proof.
   { exact (@Prod_mor CCC ([[G ]]_C v) ((v B e↑ v A)) (v A) X X0 ). }
   assert (Z : (v B e↑ v A) × v A → v B ).
   { exact (@Exp_app CCC (v A) (v B)). }
-  exact (Compose Z Y). TODO
-
-  
-
-
-
-
+  exact (Compose Z Y).
+  - assert (Inh1 : inhabited ([[G ]]_C v → v A)).
+    { apply IHTyty1; exists t; exact H0_. } clear IHTyty1 H0_.
+  assert (Inh2 : inhabited ([[G ]]_C v → v B)).
+  { apply IHTyty2; exists s; exact H0_0. } clear IHTyty2 H0_0 H t s.
+  induction Inh1, Inh2; apply inhabits.
+  rewrite VAL_cnj.
+  exact (@Prod_mor CCC ([[G ]]_C v) (v A) (v B) X X0).
+  - assert (Inh : inhabited ([[G ]]_C v → v (Cnj A B))).
+    { apply IHTyty; exists t; exact H0. } clear IHTyty H0 H t.
+  induction Inh; apply inhabits.
+  rewrite VAL_cnj in X.
+  assert (Y : v A × v B → v A).
+  { exact (@First CCC (v A) (v B)). }
+  exact (Compose Y X).
+  - assert (Inh : inhabited ([[G ]]_C v → v (Cnj A B))).
+    { apply IHTyty; exists t; exact H0. } clear IHTyty H0 H t.
+  induction Inh; apply inhabits.
+  rewrite VAL_cnj in X.
+  assert (Y : v A × v B → v B).
+  { exact (@Second CCC (v A) (v B)). }
+  exact (Compose Y X).
+Qed.
