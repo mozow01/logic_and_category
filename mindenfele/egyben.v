@@ -27,7 +27,7 @@ Inductive Tyty : Cntxt -> Trm -> Typ -> Prop :=
       Tyty (A :: G) t B -> Tyty G (lam A t) (Imp A B)
   | ND_app :
       forall G t s A B,
-      Tyty G t (Imp A B) -> Tyty G s B -> Tyty G (app t s) B
+      Tyty G t (Imp A B) -> Tyty G s A -> Tyty G (app t s) B
   | ND_cnj :
       forall G t s A B,
       Tyty G t A -> Tyty G s B -> Tyty G (cnj t s) (Cnj A B)
@@ -151,24 +151,36 @@ type_scope.
 Theorem soundness : forall v G A, (exists t, G ⊢ t [:] A) -> 
                            inhabited( ([[ G ]]_C v) → (v A) ).
 Proof.
-  intros v G A H.
+   intros v G A H.
   elim H.
   intros.
   induction H0.
   - apply inhabits.
   rewrite VAL_top.
   exact (Top_mor).
-  - apply inhabits.
-  exact (@First (CCC) (v A) ([[ G ]]_C v) ).
-  - 
-  assert (H1 : (exists t : Trm, G ⊢ t [:] A)).
-  exists (hyp I). exact H0.
+  - apply inhabits; simpl.
+  exact (@Second (CCC) ([[ G ]]_C v) (v A) ).
+  - assert (H1 : (exists t : Trm, G ⊢ t [:] A)). 
+    { exists (hyp I). exact H0. } 
   apply IHTyty in H1.
-  apply inhabited_ind with (P := inhabited ([[B :: G ]]_C v → v A)) in H1.
-  auto.
-  intros.
-  apply inhabits.
-    exact (Compose X (@Second CCC (v B) ([[ G ]]_C v))). TODO
+  induction H1; apply inhabits.
+  exact (Compose X (@First CCC ([[ G ]]_C v) (v B))).
+  - assert (Inh : inhabited ([[A :: G ]]_C v → v B)). 
+    { apply IHTyty; exists t; exact H0. } clear IHTyty H0 H t. 
+  rewrite VAL_imp; simpl in Inh. 
+  induction Inh; apply inhabits. 
+  exact (@Lam CCC ([[G ]]_C v) (v A) (v B) X). 
+  - assert (Inh1 : inhabited ([[G ]]_C v → v (Imp A B))).
+    { apply IHTyty1; exists t; exact H0_. } clear IHTyty1 H0_.
+  assert (Inh2 : inhabited ([[G ]]_C v → v A)).
+  { apply IHTyty2; exists s; exact H0_0. } clear IHTyty2 H0_0 H t s.
+  rewrite VAL_imp in Inh1.
+  induction Inh1, Inh2; apply inhabits.
+  assert (Y : ([[G ]]_C v → (v B e↑ v A) × v A )).
+  { exact (@Prod_mor CCC ([[G ]]_C v) ((v B e↑ v A)) (v A) X X0 ). }
+  assert (Z : (v B e↑ v A) × v A → v B ).
+  { exact (@Exp_app CCC (v A) (v B)). }
+  exact (Compose Z Y). TODO
 
   
 
