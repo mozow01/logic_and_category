@@ -1,1 +1,1 @@
-Az egyben.v egyelőre az a file, amiben az összes szükséges definíció megvan egyszerre. Ha majd tudok coq library-t készíteni, amit tudok importálni, akkor majd lesz egy import sor és annyi. A soundnek 3/8-ada van meg. A példáknak a 2/3-a.
+Az egyben.v egyelőre az a file, amiben az összes szükséges definíció megvan egyszerre. Ha majd tudok coq library-t készíteni, amit tudok importálni, akkor majd lesz egy import sor és annyi.
