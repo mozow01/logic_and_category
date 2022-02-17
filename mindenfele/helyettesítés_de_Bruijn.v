@@ -1,4 +1,4 @@
-````Coq
+
 Require Import List.
 Require Import Arith.
 
@@ -233,4 +233,3 @@ Eval compute in subst (lam Top (app (hyp 2) (hyp 1))) s1.
 
 Eval compute in subst_aux (lam Top (lam Top (app (hyp 0) (hyp 3)))) 1 s1.
 
-````
