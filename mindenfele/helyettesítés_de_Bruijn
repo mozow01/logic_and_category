@@ -1,4 +1,4 @@
-````coq
+````Coq
 Require Import List.
 Require Import Arith.
 
