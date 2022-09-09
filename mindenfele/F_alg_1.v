@@ -57,6 +57,13 @@ type_scope.
 
 Context {C : Category}.
 
+Require Import Coq.Setoids.Setoid.
+Add Parametric Relation {C : Category} {A B: Obj} : (Hom A B) (EqMor)
+  reflexivity proved by (Eq_ref)
+  symmetry proved by (Eq_sim)
+  transitivity proved by (Eq_trans)
+  as eq_set_rel.
+
 
 (* dependent data type - Endofunctor of a category *)
 Class EndoFunctor {C : Category} := {
@@ -68,9 +75,18 @@ EF_mor : forall {x y}, (Hom x y) -> (Hom (EF_obj x) (EF_obj y));
 (* functor laws *)
 EF_keeps_id : forall {x}, EF_mor (Id x) = Id (EF_obj x);
 EF_comp_ax : forall {x y z : @Obj C} {f g},
-      @EF_mor x z (f ∘ g) = (@EF_mor y z f) ∘ (@EF_mor x y g)
+      @EF_mor x z (f ∘ g) = (@EF_mor y z f) ∘ (@EF_mor x y g);
+EF_proper: forall {x y: @Obj C} (f g: x→y), f≡g -> EF_mor f ≡ EF_mor g
 }.
 
+
+
+Add Parametric Morphism {C: Category} {F: @EndoFunctor C} {A B: @Obj C} {f: Hom A B} : (@EF_mor C F A B)
+  with signature (EqMor) ==> (EqMor) as ef_keeps_equality.
+Proof.
+intros.
+exact (EF_proper x y H).
+Qed.
 
 (* F-algebra is a dependent type on a Category C and it's endofunctor F, and then defined by an object an a morphism (actually the morphism's domain must be the given object *)
 Class F_algebra {C : Category} (F : @EndoFunctor C) := {
@@ -102,8 +118,10 @@ Given object & endofunctor, the set of F-algebras defined by these is the set of
 *)
 
 
+Definition is_homomorphism {C : Category} (F : @EndoFunctor C) (x : F_algebras_Obj F) (y : F_algebras_Obj F) 
+ :=  (fun (f : @Hom C (projT1 x) (projT1 y) ) =>  ((projT2 y) ∘ (EF_mor f )) ≡ (f ∘ (projT2 x) ) ).
 Definition F_algebras_Hom {C : Category} (F : @EndoFunctor C) (x : F_algebras_Obj F) (y : F_algebras_Obj F) 
-:= (sig (fun (f : @Hom C (projT1 x) (projT1 y) ) =>  ((projT2 y) ∘ (EF_mor f )) ≡ (f ∘ (projT2 x) ) )).
+:= (sig (is_homomorphism F x y)).
 Print projT1.
 (* morphisms between two f-algebras are mophisms between the carries that also satisfy the law of the square commuting, so a: F A -> A and b: F B -> B morphisms and associated F-algebras, the morphism x: A->B of C is also a morphism between the F-algebras if F x: F A -> F B and F x >> b = a >> x
 
@@ -122,7 +140,7 @@ Definition F_algebras_Id {C : Category} (F : @EndoFunctor C) (x : F_algebras_Obj
   set (Carrier:=projT1 x) in *; set (Morphism := projT2 x) in *.
   (* Id of Carrier defines such a morphism for F-algebras *)
   exists (@Id C Carrier).
-
+  unfold is_homomorphism.
   rewrite EF_keeps_id.
   apply Eq_trans with (Morphism).
   apply id_1.
@@ -153,6 +171,7 @@ Definition F_algebras_Comp {C : Category} (F : @EndoFunctor C) (x y z : F_algebr
   set (H:= proj1_sig h); set(K := proj1_sig k); set (ZMorph := projT2 z); set (XMorph:= projT2 x); set (YMorph := projT2 y).
   exists (H ∘ K).
   set (HProof := proj2_sig h); set (KProof := proj2_sig k).
+  unfold is_homomorphism.
   rewrite EF_comp_ax.
 
 
@@ -192,9 +211,15 @@ Definition F_algebras_Comp {C : Category} (F : @EndoFunctor C) (x y z : F_algebr
   exact KProof.
 Defined.
 
-Theorem F_algebras_form_a_Category {C : Category} (F : @EndoFunctor C) : Category.
+#[refine]
+Instance falg_cat `(C : Category, F : @EndoFunctor C) : Category := {
+  Obj:= @F_algebras_Obj C F;
+  Hom:= @F_algebras_Hom C F;
+  Id := @F_algebras_Id C F;
+  Compose:= @F_algebras_Comp C F;
+  EqMor:=@F_algebras_EqMor C F;
+}.
 Proof.
-  apply (cat_mk (@F_algebras_Obj C F) (@F_algebras_Hom C F) (@F_algebras_Id C F) (@F_algebras_Comp C F) (@F_algebras_EqMor C F)).
 
   (* (x->y) = (x->y) *)
   intros.
@@ -242,4 +267,117 @@ Proof.
   apply eq_2.
   unfold F_algebras_EqMor in H.
   exact H.
+Defined.
+
+Definition mapped_f_algebra {C: Category} (F: @EndoFunctor C) (alg: F_algebras_Obj F): F_algebras_Obj F.
+Proof.
+set (X := projT1 alg) in *.
+set (morphism := projT2 alg).
+set (FX := EF_obj X).
+set (FFX := EF_obj FX).
+set (Fm := EF_mor morphism).
+unfold F_algebras_Obj.
+exists (FX).
+unfold object_is_carrier.
+exact Fm.
+Defined.
+
+Definition is_isomorphism {C: Category} {A B: @Obj C} (mor: Hom A B) : Prop := exists mor2, mor>>mor2 ≡ Id A /\ mor2>>mor ≡ Id B.
+
+Class InitCat {C: Category} := {
+(* initial *)
+
+ Initial_obj : @Obj C;
+
+ Initial_mor : forall {x: @Obj C},  Initial_obj → x;
+
+  unique_initial : forall {x: @Obj C} (f : Initial_obj → x), f ≡ Initial_mor
+}.
+Check Initial_obj.
+
+Definition underlying_morphism {C: Category} (F: @EndoFunctor C) {A B} (mor: @F_algebras_Hom C F A B) : Hom (projT1 A) (projT1 B):= proj1_sig mor.
+
+
+Theorem invert_means_iso {C: Category} {A B: @Obj C} (i: Hom A B) (j: Hom B A) (P1: (i>>j≡Id A)) (P2: (j>>i≡Id B)): is_isomorphism i.
+unfold is_isomorphism.
+exists j.
+split.
+exact P1.
+exact P2.
+Qed. 
+
+Theorem projection_eq {C: Category} (F: @EndoFunctor C) (A B: F_algebras_Obj F) (f g : F_algebras_Hom F A B) (P: F_algebras_EqMor F A B f g) : proj1_sig f ≡ proj1_sig g.
+auto.
+Defined.
+
+Theorem Lambek {C : Category} (F : @EndoFunctor C) (initob: @InitCat (falg_cat C F)) : is_isomorphism (projT2 (@Initial_obj (falg_cat C F) initob)).
+set (cat_of_fs := (falg_cat C F)).
+set (initial_algebra:=(@Initial_obj (falg_cat C F) initob)).
+set (i:=projT1 initial_algebra).
+set (j:=projT2 initial_algebra) in *. 
+set (other_obj := mapped_f_algebra F initial_algebra).
+set (m := @Initial_mor cat_of_fs initob other_obj).
+set (m' := underlying_morphism F m).
+set (Fi:= EF_obj i).
+set (FFi:= EF_obj Fi).
+set (Fm' := EF_mor m').
+set (Fj := projT2 other_obj).
+
+(* 2 ablakos diagram comutes *)
+assert (D_COMMUTES :j>>(m'>>j) ≡ (Fm'>>Fj)>>j).
+apply Eq_sim.
+apply Eq_trans with (g:=(j>>m')>>j).
+apply eq_1.
+exact (proj2_sig m).
+apply assoc.
+
+set (complex_id := m'>>j).
+
+(* need to create a homomorphism from complex_id_homo as it's now proven to be one *)
+
+(* proove that m'>>j is a homomorphism *)
+assert (COMPOSITE_IS_HOMOMORPHISM : j ∘ (EF_mor complex_id ) ≡ (complex_id ∘ j)).
+apply Eq_sim.
+unfold complex_id.
+rewrite EF_comp_ax.
+exact D_COMMUTES.
+
+(* now with the proof we can create the object *)
+set (that_homo := exist (is_homomorphism F initial_algebra initial_algebra) complex_id COMPOSITE_IS_HOMOMORPHISM).
+
+
+(* now need to show that that_homo is also equiv to idi *)
+
+(* we use the fact that the algebra is initial to proove that the two homomorphisms equal *)
+set (initial_morphism :=(@Initial_mor cat_of_fs initob initial_algebra)).
+assert (that_homo ≡ Id initial_algebra).
+apply Eq_trans with (g:=initial_morphism).
+apply unique_initial.
+apply Eq_sim.
+apply unique_initial.
+
+(* but that also implies that the underlying morphisms also equal *)
+assert (l_id_1 : m'>>j≡Id i).
+auto.
+
+(* now do the opposite - show that j>>m' ≡ Id Fi *)
+(* we need to proove that it' s a hom as well *)
+assert (l_id_2 : j>>m' ≡  Id Fi  ).
+symmetry.
+apply Eq_trans with (g:=EF_mor (Id i)).
+apply Eq_sim.
+replace (EF_mor (Id i)) with (Id Fi).
+apply Eq_ref.
+symmetry.
+apply EF_keeps_id.
+apply Eq_trans with (g:=EF_mor (m'>>j) ).
+apply Eq_sim.
+apply EF_proper.
+exact l_id_1.
+rewrite EF_comp_ax.
+exact (proj2_sig m).
+
+fold m.
+exact (invert_means_iso j m' l_id_2 l_id_1).
 Qed.
+
