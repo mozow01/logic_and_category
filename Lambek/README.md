@@ -1,7 +1,7 @@
-## The definition of Category in the Monoid Hell (aka categotry with morphism equiality)
+## The definition of Category in the Monoid Hell (aka categotry with morphism equality)
 
 ````coq
-(*The definition of Category in the Monoid Hell (aka categotry with morphism equiality) *)
+(*The definition of Category in the Monoid Hell (aka categotry with morphism equality) *)
 
 (* generic parameterized typeclass, no implementations for any field *)
 Class Category := cat_mk {
