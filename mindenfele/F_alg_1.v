@@ -26,11 +26,8 @@ Class Category := cat_mk {
 
   id_2 : forall x y (f : (Hom x y)), EqMor (Compose (Id y) f) f ;
 
-  eq_1 : forall {x y z} (f: Hom y z) (g h : Hom x y), EqMor g h ->
-        EqMor (Compose f g) (Compose f h);
-  eq_2 : forall {x y z} (f: Hom x y) (g h : Hom y z), EqMor g h ->
-        EqMor (Compose g f) (Compose h f);
-
+  eq: forall {x y z} (f g: Hom y z) (h i : Hom x y), EqMor f g /\ EqMor h i ->
+        EqMor (Compose f h) (Compose g i);
 }.
 Print EqMor.
 
@@ -44,8 +41,7 @@ type_scope.
 Notation "f ≡ g" := (EqMor f g) (at level 40, left associativity) :
 type_scope.
 
-Context {C : Category}.
-
+(* Context {C : Category}.*)
 (*
 Setoid hell help: hint to Coq that this Eq_mor is an equivalence relation, so built-in commands can use it as such
 *)
@@ -57,40 +53,63 @@ Add Parametric Relation {C : Category} {A B: Obj} : (Hom A B) (EqMor)
   transitivity proved by (Eq_trans)
   as eq_set_rel.
 
+Add Parametric Morphism {C: Category} {a b c: @Obj C} : (@Compose C a b c)
+  with signature (EqMor) ==> (EqMor) ==> (EqMor) as compose_keeps_equality.
+Proof.
+intros.
+apply eq.
+split.
+exact H.
+exact H0.
+Qed.
 
+
+Lemma eq_1 : forall {C: Category} {x y z} (f: Hom y z) (g h : Hom x y), EqMor g h ->
+EqMor (Compose f g) (Compose f h).
+Proof.
+intros.
+apply eq.
+split.
+reflexivity.
+exact H.
+Qed.
+
+Lemma eq_2 : forall {C: Category} {x y z} (f: Hom x y) (g h : Hom y z), EqMor g h ->
+        EqMor (Compose g f) (Compose h f).
+Proof.
+intros.
+apply eq.
+split.
+exact H.
+reflexivity.
+Qed.
 
 
 (* dependent data type - Endofunctor of a category *)
-Class EndoFunctor {C : Category} := {
+Class EndoFunctor {C : Category} := ef_mk {
   EF_obj : @Obj C -> @Obj C; (* object->object map *)
   EF_mor : forall {x y}, (Hom x y) -> (Hom (EF_obj x) (EF_obj y)); (* morphism->morphism map *)
 
   (* functor laws *)
-  EF_keeps_id : forall {x}, EF_mor (Id x) = Id (EF_obj x);
+  EF_keeps_id : forall {x}, EF_mor (Id x) ≡ Id (EF_obj x);
   EF_comp_ax : forall {x y z : @Obj C} {f g},
-        @EF_mor x z (f ∘ g) = (@EF_mor y z f) ∘ (@EF_mor x y g);
+        @EF_mor x z (f ∘ g) ≡ ((@EF_mor y z f) ∘ (@EF_mor x y g));
   EF_proper: forall {x y: @Obj C} (f g: x→y), f≡g -> EF_mor f ≡ EF_mor g
   (* proper: morphism mapping is proper, i.e. it preservers equivalence *)
 }.
 
+
+Add Parametric Morphism {C: Category} {F: @EndoFunctor C} {A B: @Obj C} {f: Hom A B} : (@EF_mor C F A B)
+  with signature (EqMor) ==> (EqMor) as ef_keeps_equality.
+Proof.
+intros.
+exact (EF_proper x y H).
+Qed.
 (* F-algebra is a dependent type on a Category C and it's endofunctor F, and then defined by an object an a morphism (actually the morphism's domain must be the given object *)
 Class F_algebra {C : Category} (F : @EndoFunctor C) := {
   Carr_F_alg : @Obj C;
   Mor_F_alg : Hom ((@EF_obj C F) Carr_F_alg) Carr_F_alg
 }.
-
-(* now this is a part I can't grasp yet *)
-Ltac Kitten :=
-  repeat match goal with
-           | [ H : ?P |- ?P ] => exact H
-           | [ |- (?P ∘ (Id ?Q)) ≡ ?P  ] => apply id_1
-           | [ |- ((Id ?Q) ∘ ?P) ≡ ?P  ] => apply id_2
-           | [ |- ?P ≡ ?P  ] => apply Eq_ref
-           | [ H : ?P ≡ ?Q |- ?Q ≡ ?P ] => symmetry
-           | [ |- (?P ∘ ?Q) ≡ (?P ∘ ?R) ] => apply eq_1
-           | [ |- ( ?Q ∘ ?P ) ≡ (?R ∘ ?P) ] => apply eq_1
-         end.
-
 
 Definition constructor_morphism {C: Category} (F: @EndoFunctor C) := fun (x:@Obj C) => Hom (@EF_obj C F x) x.
 Definition F_algebras_Obj {C : Category} (F : @EndoFunctor C) := (@sigT (@Obj C) (@constructor_morphism C F ) ) : Type.
@@ -119,10 +138,13 @@ Definition F_algebras_Id {C : Category} (F : @EndoFunctor C) (x : F_algebras_Obj
   (* Id of Carrier defines such a morphism for F-algebras *)
   exists (@Id C Carrier).
   unfold is_homomorphism.
-  rewrite EF_keeps_id.
+  fold Carrier.
+  setoid_replace (@EF_mor C F Carrier Carrier (Id Carrier)) with (Id (EF_obj Carrier)).
   transitivity (Morphism).
   apply id_1.
   symmetry; apply id_2.
+  apply EF_keeps_id.
+
 Defined.
 
 
@@ -147,7 +169,6 @@ Definition F_algebras_Comp {C : Category} (F : @EndoFunctor C) (x y z : F_algebr
   set (HProof := proj2_sig h); set (KProof := proj2_sig k).
   unfold is_homomorphism.
   rewrite EF_comp_ax.
-
   (* Zmorph ∘ (FH ∘ FK) -> ZMorph ∘ FH ∘ FK *)
   symmetry.
   transitivity (ZMorph ∘ EF_mor (H) ∘ EF_mor (K)).
@@ -158,7 +179,7 @@ Definition F_algebras_Comp {C : Category} (F : @EndoFunctor C) (x y z : F_algebr
   (* H is a homomorphism -> swap F(H)>>Z = (y>>H) *)
   symmetry.
   transitivity (H ∘ YMorph ∘ EF_mor (K)).
-  2: symmetry; apply eq_2; apply HProof.
+  2: apply eq_2 with (g:=H∘YMorph) (h:=ZMorph ∘ EF_mor H); symmetry; apply HProof.
 
 
   (* H∘(...a)≡H∘(...b) -> (...a)≡(...b) *)
@@ -221,20 +242,17 @@ Proof.
   intros.
   unfold F_algebras_EqMor.
   apply id_2.
-
-  (* g=h -> f>>g = f>>h *)
+  
   intros.
   unfold F_algebras_EqMor.
-  apply eq_1.
-  unfold F_algebras_EqMor in H.
-  exact H.
+  compute.
+  unfold F_algebras_Comp.
 
-  (* g=h -> g>>f = h>>f *)
-  intros.
-  unfold F_algebras_EqMor.
-  apply eq_2.
-  unfold F_algebras_EqMor in H.
-  exact H.
+  setoid_replace (proj1_sig f ∘ proj1_sig h) with (proj1_sig g ∘ proj1_sig i).
+  reflexivity.
+  apply eq.
+  split.
+  all: apply H.
 Defined.
 
 Definition mapped_f_algebra {C: Category} (F: @EndoFunctor C) (alg: F_algebras_Obj F): F_algebras_Obj F.
@@ -306,6 +324,8 @@ assert (COMPOSITE_IS_HOMOMORPHISM : constr ∘ (EF_mor comp_id' ) ≡ (comp_id' 
 symmetry.
 unfold comp_id'.
 rewrite EF_comp_ax.
+symmetry.
+symmetry.
 exact M_IS_HOMO.
 
 (* now with the proof we can create the object *)
@@ -329,20 +349,239 @@ auto.
 (* now do the opposite - show that j>>m' ≡ Id Fi *)
 (* we need to proove that it' s a hom as well *)
 assert (l_id_2 : m'∘constr ≡  Id Fcarr  ).
+setoid_replace (Id Fcarr) with (EF_mor (Id carr)).
 symmetry.
-transitivity (EF_mor (Id carr)).
-symmetry.
-replace (EF_mor (Id carr)) with (Id Fcarr).
-reflexivity.
-symmetry.
-apply EF_keeps_id.
-transitivity (EF_mor (constr∘m') ).
-symmetry.
+transitivity (EF_mor (constr∘m')).
 apply EF_proper.
-exact l_id_1.
+symmetry.
+auto.
 rewrite EF_comp_ax.
 exact (proj2_sig m).
+symmetry.
+apply EF_keeps_id.
 
 fold m.
 exact (invert_means_iso constr m' l_id_2 l_id_1).
 Qed.
+
+
+Class TermCat {C: Category} := {
+ Terminal_obj : @Obj C;
+ Terminal_mor : forall {x: @Obj C},  x → Terminal_obj;
+ unique_terminal : forall {x: @Obj C} (f : x → Terminal_obj), f ≡ Terminal_mor
+}.
+
+Class CoProd {C: Category} := {
+  Sum_obj : Obj -> Obj -> Obj;
+
+  Sum_mor : forall {x1 x2 z} (f:x1 → z) (g:x2 → z), (Sum_obj x1 x2) → z;
+
+  in_1 {x y} : x→(Sum_obj x y);
+  in_2 {x y} : y→(Sum_obj x y);
+
+  sum_ax : forall {x1 x2 z} (f1 : x1 → z) (f2 : x2 → z), 
+    ((Sum_mor f1 f2) ∘ in_1 ≡ f1) /\ ((Sum_mor f1 f2) ∘ in_2 ≡ f2);
+    
+  sum_eq : forall {x1 x2 z} (g : Sum_obj x1 x2 → z),
+    Sum_mor (g ∘ in_1) (g ∘in_2) ≡ g;
+
+  sum_proper : forall {x1 x2 z} {h j: x2→z} (f g: x1→z), f≡g /\ h≡j -> Sum_mor f h ≡ Sum_mor g j;
+}.
+
+
+
+Class NatCat {C: Category} (TC: TermCat) := {
+  N: Obj;
+  N0 :  Terminal_obj → N;
+  NS : N→N;
+  nat_mor: forall (M: Obj) (z: Terminal_obj→M) (f: M→M), N→M;
+  nat_mor_ax: forall (M: Obj) (z: Terminal_obj→M) (f: M→M), (nat_mor M z f)∘N0≡z /\ f ∘ (nat_mor M z f) ≡ ((nat_mor M z f) ∘ NS);
+  nat_mor_uniq : forall (M: Obj) (z: Terminal_obj→M) (f: M→M) (g: N→M), g≡nat_mor M z f
+}.
+
+Add Parametric Morphism {C: Category} {CC: CoProd} {A B AB: @Obj C} : (@Sum_mor C CC A B AB)
+  with signature (EqMor) ==> (EqMor) ==> (EqMor) as sum_mor_keeps_eq.
+Proof.
+intros.
+apply sum_proper.
+split.
+exact H.
+exact H0.
+Qed.
+
+#[refine]
+Instance NatFunctor {C: Category} (CC: CoProd) (TC: TermCat) : EndoFunctor := {
+  EF_obj := fun x => Sum_obj Terminal_obj x;
+  EF_mor := fun {X Y} (f: X→Y) => Sum_mor (in_1) (in_2 ∘ f);
+}.
+Proof.
+(* keeps id *)
+intros.
+rewrite id_1.
+setoid_replace (@in_1 C CC Terminal_obj x) with ((Id (Sum_obj Terminal_obj x)) ∘ in_1).
+2: symmetry; apply id_2.
+setoid_replace (@in_2 C CC Terminal_obj x) with ((Id (Sum_obj Terminal_obj x)) ∘ in_2).
+2: symmetry; apply id_2.
+apply sum_eq.
+
+(* keeps composition *)
+intros.
+(* second projection is in_2 ∘ f ∘ g *)
+assert (((Sum_mor in_1 (@in_2 C CC Terminal_obj z ∘ f))∘(Sum_mor in_1 (in_2 ∘ g))) ∘ in_2 ≡ (in_2 ∘ f ∘ g)).
+symmetry.
+transitivity ((Sum_mor in_1 (@in_2 C CC Terminal_obj z ∘ f))∘((Sum_mor in_1 (in_2 ∘ g)) ∘ in_2)).
+2: apply assoc.
+transitivity ((Sum_mor in_1 (@in_2 C CC Terminal_obj z ∘ f))∘in_2∘g).
+transitivity (@in_2 C CC Terminal_obj z ∘f∘g).
+2: symmetry; apply eq_2; apply sum_ax.
+reflexivity.
+transitivity ((Sum_mor in_1 (@in_2 C CC Terminal_obj z ∘ f))∘(in_2∘g)).
+symmetry; apply assoc.
+symmetry.
+apply eq_1.
+apply sum_ax.
+(* first projection is in_1 *)
+assert (((Sum_mor in_1 (@in_2 C CC Terminal_obj z ∘ f))∘(Sum_mor in_1 (in_2 ∘ g))) ∘ in_1 ≡ in_1).
+symmetry.
+transitivity ((Sum_mor in_1 (@in_2 C CC Terminal_obj z ∘ f))∘((Sum_mor in_1 (in_2 ∘ g)) ∘ in_1)).
+transitivity ((Sum_mor in_1 (@in_2 C CC Terminal_obj z ∘ f))∘in_1).
+2: symmetry; apply eq_1; apply sum_ax.
+symmetry; apply sum_ax.
+apply assoc.
+(* it's equal to it's first and second projection's sum morphism *)
+set (ugly := ((Sum_mor in_1 (@in_2 C CC Terminal_obj z ∘ f))∘((Sum_mor in_1 (in_2 ∘ g))))).
+fold ugly in H.
+fold ugly in H0.
+transitivity (Sum_mor (ugly ∘ in_1) ((ugly ∘ in_2))).
+2: apply sum_eq.
+(* since we know them, just replace *)
+setoid_replace (ugly ∘ in_1) with (@in_1 C CC Terminal_obj z).
+2: apply H0.
+setoid_replace (ugly ∘ in_2) with (@in_2 C CC Terminal_obj z ∘ (f ∘ g)).
+reflexivity. (*goal is proved, rest is just proof of valid replace*)
+setoid_replace ((@in_2 C CC Terminal_obj z) ∘ (f ∘ g)) with ((@in_2 C CC Terminal_obj z) ∘ f∘g).
+apply H.
+apply assoc.
+
+
+(* proper *)
+intros.
+setoid_replace (f) with (g).
+reflexivity.
+exact H.
+Defined.
+
+Lemma ComponentwiseEqual {Cat: Category} {CC: CoProd} {A B C} (f1 f2: A→B) (g1 g2: C→B) : f1≡f2/\g1≡g2 -> Sum_mor f1 g1 ≡ Sum_mor f2 g2.
+Proof.
+intros.
+setoid_replace f1 with f2.
+setoid_replace g1 with g2.
+reflexivity.
+all: apply H.
+Qed.
+
+
+Lemma ComponentwiseEqual2 {Cat: Category} {CC: CoProd} {X1 X2 S} (f1: X1→S) (f2: X2→S) (g: Sum_obj X1 X2→S) : f1≡(g∘in_1)/\f2≡(g∘in_2) -> Sum_mor f1 f2 ≡ g.
+Proof.
+intros.
+setoid_replace f1 with (g∘in_1).
+setoid_replace f2 with (g∘in_2).
+apply sum_eq.
+all: apply H.
+Qed.
+
+Lemma proj1_sig_eq {cat: Category} {F: EndoFunctor} {X Y : F_algebras_Obj F} {A B: F_algebras_Hom F X Y} : proj1_sig A ≡ proj1_sig B -> F_algebras_EqMor F X Y A B.
+Proof.
+auto.
+Qed.
+
+#[refine]
+Instance InitNat (C: Category) (TC: @TermCat C) (NC: @NatCat C TC) (CC: @CoProd C) : @InitCat (falg_cat C (NatFunctor CC TC)) := {
+(* initial *)
+
+}.
+Proof.
+  (* initial Nat Object *)
+  exists (@N C TC NC).  
+  (* we need the constructor morphism! *)
+  exact (Sum_mor N0 NS).
+  set (Nat := (existT (constructor_morphism (NatFunctor CC TC)) N (Sum_mor N0 NS))).
+  set (NatMor := projT2 Nat).
+  set (NatObj := projT1 Nat).  
+  (* now we need a morphism from this to every other nat-like *)
+  intros.
+  set (ConstrX := projT2 x).
+  set (CarrX := projT1 x).
+  set (NatNatMor := nat_mor (CarrX) (ConstrX ∘ in_1) (ConstrX ∘ in_2)).
+  (* Nat says we have a morphism, but needs the morphisms of this nat-like, but they are in a combined form in it's constructo *)
+  exists (NatNatMor).
+  (* need to prove that it's a homo *)
+  unfold is_homomorphism.
+  fold NatMor ConstrX.
+  transitivity (ConstrX ∘ (Sum_mor (@in_1 C CC Terminal_obj CarrX) (in_2 ∘ NatNatMor))).
+  apply eq_1.
+  reflexivity.
+  setoid_replace NatMor with (Sum_mor N0 NS).
+  2: reflexivity.
+  set (z:= ConstrX ∘ in_1).
+  set (f:= ConstrX ∘ in_2).
+  setoid_replace ConstrX with (Sum_mor z f).
+  2: symmetry; apply sum_eq.
+  set (leftSide := Sum_mor z f ∘ Sum_mor in_1 (in_2 ∘ NatNatMor)). 
+  transitivity (Sum_mor (leftSide∘in_1) (leftSide∘in_2)).
+  symmetry; apply sum_eq.
+  setoid_replace (leftSide∘in_1) with (z).
+  setoid_replace (leftSide∘in_2) with (f∘NatNatMor).
+  transitivity (Sum_mor (NatNatMor∘N0) (NatNatMor ∘ NS)).
+  apply ComponentwiseEqual.
+  split.
+  symmetry;apply nat_mor_ax.
+  apply nat_mor_ax.
+  apply ComponentwiseEqual2.
+  split.
+  transitivity (NatNatMor ∘ (Sum_mor N0 NS ∘ in_1)).
+  apply eq_1.
+  symmetry.
+  apply sum_ax.
+  apply assoc.
+  transitivity (NatNatMor ∘ (Sum_mor N0 NS ∘ in_2)).
+  apply eq_1.
+  symmetry.
+  apply sum_ax.
+  apply assoc.
+
+  (*
+    proove Sum_mor z f ∘ Sum_mor in_1 (in_2 ∘ NatNatMor) ∘ in_2 ≡ (f ∘ NatNatMor) 
+    Just always reduct with in_2 til finished - takes a few associativities
+  *)
+  unfold leftSide.
+  transitivity (Sum_mor z f ∘ (Sum_mor in_1 (in_2 ∘ NatNatMor) ∘ in_2)).
+  symmetry; apply assoc.
+  transitivity (Sum_mor z f ∘ (in_2 ∘ NatNatMor)).
+  apply eq_1; apply sum_ax.
+  transitivity (Sum_mor z f ∘ in_2 ∘ NatNatMor).
+  apply assoc.
+  apply eq_2.
+  apply sum_ax.
+
+  (* 
+    proove Sum_mor z f ∘ Sum_mor in_1 (in_2 ∘ NatNatMor) ∘ in_1 ≡ z
+    similar to before
+  *)
+  unfold leftSide.
+  transitivity (Sum_mor z f ∘ (Sum_mor in_1 (in_2 ∘ NatNatMor) ∘ in_1)).
+  symmetry; apply assoc.
+  transitivity (Sum_mor z f ∘ in_1).
+  apply eq_1; apply sum_ax.
+  apply sum_ax.
+
+  (* uniqness - our morphism is the only one *)
+  intros.
+  apply (@proj1_sig_eq C (NatFunctor CC TC)).
+  apply (nat_mor_uniq (projT1 x) (projT2 x ∘ in_1) (projT2 x ∘ in_2)).
+  (* saw that crazy wall-of-text after intros? Took me some time to decipher what it means...*)
+Defined.
+
+
+Definition NatIsVeryCool (C: Category) (TC: @TermCat C) (NC: @NatCat C TC) (CC: @CoProd C) := @Lambek C (NatFunctor CC TC) (InitNat C TC NC CC).
+Print NatIsVeryCool.
