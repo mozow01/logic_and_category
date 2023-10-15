@@ -27,7 +27,7 @@ Inductive Tyty : Cntxt -> Trm -> Typ -> Prop :=
       Tyty (A :: G) t B -> Tyty G (lam A t) (Imp A B)
   | ND_app :
       forall G t s A B,
-      Tyty G t (Imp A B) -> Tyty G s B -> Tyty G (app t s) B
+Tyty G t (Imp A B) -> Tyty G s A -> Tyty G (app t s) B
   | ND_cnj :
       forall G t s A B,
       Tyty G t A -> Tyty G s B -> Tyty G (cnj t s) (Cnj A B)
